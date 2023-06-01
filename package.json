@@ -1,0 +1,17 @@
+{
+	"scripts": {
+		"build": "npx webpack",
+		"watch": "npx webpack --watch --mode=production"
+	},
+	"devDependencies": {
+		"@types/react": "^18.2.7",
+		"@types/tampermonkey": "^4.0.10",
+		"ts-loader": "^9.4.3",
+		"typescript": "^5.0.4",
+		"webpack": "^5.84.1",
+		"webpack-cli": "^5.1.1"
+	},
+	"dependencies": {
+		"react": "^18.2.0"
+	}
+}

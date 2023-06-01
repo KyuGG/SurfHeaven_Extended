@@ -1,0 +1,17 @@
+{
+	"compilerOptions": {
+		"module": "es6",
+		"target": "es6",
+		"moduleResolution": "node",
+		"esModuleInterop": true,
+		"allowSyntheticDefaultImports": true,
+		"strict": true,
+		"sourceMap": true,
+		"declaration": false,
+		"jsx": "react",
+		"outDir": "./dist",
+		"rootDir": "./src"
+	},
+	"include": ["src/**/*.ts", "src/second.tsx"],
+	"exclude": ["node_modules"]
+}

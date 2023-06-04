@@ -28,6 +28,8 @@ import loadSettings, { settings_labels } from './loadSettings'
     - (prettier) Rank threshold settings in servers page
     - user effects seem to disable hover div???
 */
+import loadUserEffects from './loadUserEffects'
+import addLogo from './addLogo'
 ;(async function () {
 	'use strict'
 
@@ -111,71 +113,10 @@ import loadSettings, { settings_labels } from './loadSettings'
 	// SETTINGS
 	const settings = loadSettings()
 
-	
-
 	// USER EFFECTS
-	let user_effects = {}
-	let last_updated_effects = unsafeWindow.localStorage.getItem('user_effects_last_updated')
-	if (last_updated_effects === null || Date.now() - Number(last_updated_effects) > 1000 * 60 * 5) {
-		console.log('Updating user_effects.json')
-		unsafeWindow.localStorage.setItem('user_effects_last_updated', String(Date.now()))
-		fetch('https://iloveur.mom/surfheaven/user_effects.json', { cache: 'no-cache' })
-			.then(response => response.json())
-			.then(data => {
-				console.log('Updated user_effects.json')
-				unsafeWindow.localStorage.setItem('user_effects', JSON.stringify(data))
-				user_effects = data
-			})
-	}
+	const user_effects = await loadUserEffects()
 
-	user_effects = JSON.parse(unsafeWindow.localStorage.getItem('user_effects'))
-
-	for (let user in user_effects) {
-		if (user_effects != null && user_effects[user] != null) {
-			if (user_effects[user].startsWith('candycane-custom')) {
-				create_custom_candycane_style(user_effects[user])
-			}
-		}
-	}
-
-	function create_custom_candycane_style(style_name) {
-		let colors = style_name.split('-').slice(2)
-		if (colors.length == 1) {
-			// single color
-			//console.log(`Creating custom style: ${colors[0]}`);
-			GM_addStyle(`.candycane-custom-${colors[0]} {
-                color: ${colors[0]};
-            }`)
-			return
-		}
-		let cssColors = colors
-			.map((color, index) => {
-				if (index === 0) {
-					return `${color}, ${color} 10px,`
-				} else if (index === colors.length - 1) {
-					return `${color} ${index * 10}px, ${color} ${(index + 1) * 10}px`
-				}
-				return `${color} ${index * 10}px, ${color} ${(index + 1) * 10}px,`
-			})
-			.join(' ')
-
-		//console.log(`Creating custom style: ${colors.join(' ')}`);
-		GM_addStyle(`.candycane-custom-${colors.join('-')} {
-          background: repeating-linear-gradient(45deg, ${cssColors});
-          background-size: 1600%;
-          color: transparent;
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          -webkit-animation: 40s linear 0s infinite move;
-          animation: 40s linear 0s infinite move;
-          font-weight: bold;
-        }`)
-		//console.log(`.candycane-custom-${colors.join('-')} {
-		//    background: repeating-linear-gradient(45deg, ${cssColors});
-		//  `)
-	}
-
-	function apply_user_effect(id, element) {
+	function apply_user_effect(id: string, element: Element) {
 		if (!settings.user_effects) return
 		let effect = ''
 		if (id in user_effects) {
@@ -192,20 +133,7 @@ import loadSettings, { settings_labels } from './loadSettings'
 	}
 
 	// Text under "SurfHeaven"
-	const logo = document.querySelector('.navbar-brand')
-	let logo_text = document.createElement('div')
-	logo_text.id = 'logo_text'
-	logo_text.innerHTML =
-		"<a style='color:#FFFFFF;' href='https://github.com/Kalekki/SurfHeaven_Extended' target='_blank'>Extended</a>"
-	logo_text.style.position = 'absolute'
-	logo_text.style.bottom = '0px'
-	logo_text.style.fontSize = '10px'
-	logo_text.style.color = '#FFFFFF'
-	logo_text.style.padding = '0px 0px'
-	logo_text.style.zIndex = '100'
-	logo_text.style.bottom = '5px'
-	logo_text.style.left = '95px'
-	logo.appendChild(logo_text)
+	addLogo()
 
 	// SERVERS PAGE
 	if (window.location.pathname.endsWith('/servers/')) {
@@ -702,7 +630,7 @@ import loadSettings, { settings_labels } from './loadSettings'
 		}
 	}
 
-	const navbar = document.querySelector('.nav')
+	const navbar = document.querySelector('.nav') as HTMLUListElement
 	const li_wrapper = document.createElement('li')
 	const settings_link = document.createElement('a')
 	const map_tag_link = document.createElement('a')
@@ -795,11 +723,11 @@ import loadSettings, { settings_labels } from './loadSettings'
 	}
 
 	function make_navbar_compact() {
-		let navbar = document.querySelector('form.navbar-form')
+		let navbar = document.querySelector('form.navbar-form') as HTMLFormElement
 		let items = navbar.querySelectorAll('li')
 		for (let i = 0; i < items.length; i++) {
 			let a = items[i].querySelector('a')
-			if (a.href.includes('discord') || a.href.includes('youtube')) {
+			if (a && (a.href.includes('discord') || a.href.includes('youtube'))) {
 				items[i].remove()
 			}
 		}

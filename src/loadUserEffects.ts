@@ -1,20 +1,15 @@
+/**
+ * loads css classes from localStorage or api
+ * @returns userEffects object
+ */
 export default async function loadUserEffects() {
-	let user_effects: UserEffects = {}
-	let last_updated_effects = unsafeWindow.localStorage.getItem('user_effects_last_updated')
+	let user_effects: UserEffects = JSON.parse(
+		unsafeWindow.localStorage.getItem('user_effects') || '{}'
+	)
 
-	const now = Date.now()
-	if (last_updated_effects === null || now - Number(last_updated_effects) > 1000 * 60 * 5) {
-		console.log('Updating user_effects.json')
-		unsafeWindow.localStorage.setItem('user_effects_last_updated', String(now))
-		const data: UserEffects = await fetch('https://iloveur.mom/surfheaven/user_effects.json', {
-			cache: 'no-cache',
-		}).then(response => response.json())
-
-		console.log('Updated user_effects.json')
-		unsafeWindow.localStorage.setItem('user_effects', JSON.stringify(data))
-	}
-
-	user_effects = JSON.parse(unsafeWindow.localStorage.getItem('user_effects'))
+	const isUpdated = await updateUserEffects()
+	if (isUpdated)
+		user_effects = JSON.parse(unsafeWindow.localStorage.getItem('user_effects') as string)
 
 	for (let user in user_effects) {
 		if (user_effects != null && user_effects[user] != null) {
@@ -23,7 +18,10 @@ export default async function loadUserEffects() {
 			}
 		}
 	}
+
+	return user_effects
 }
+
 function create_custom_candycane_style(style_name: string) {
 	let colors = style_name.split('-').slice(2)
 	if (colors.length == 1) {
@@ -55,6 +53,37 @@ function create_custom_candycane_style(style_name: string) {
           animation: 40s linear 0s infinite move;
           font-weight: bold;
         }`)
+}
+
+/**
+ * @returns true if updated, false if update is not needed or got fetch error
+ */
+async function updateUserEffects() {
+	const USER_EFFECTS_URL = 'https://iloveur.mom/surfheaven/user_effects.json'
+
+	const last_updated_effects = unsafeWindow.localStorage.getItem('user_effects_last_updated')
+	const MIN5 = 1000 * 60 * 5
+
+	const now = Date.now()
+	if (!last_updated_effects || now - Number(last_updated_effects) > MIN5) {
+		console.log('Updating user_effects.json')
+		unsafeWindow.localStorage.setItem('user_effects_last_updated', String(now))
+		const data: UserEffects = await fetch(USER_EFFECTS_URL, {
+			cache: 'no-cache',
+		})
+			.then(response => response.json())
+			.catch(e => {
+				console.log(e)
+				return false
+			})
+
+		console.log('Updated user_effects.json')
+		unsafeWindow.localStorage.setItem('user_effects', JSON.stringify(data))
+
+		return true
+	}
+
+	return false
 }
 
 type UserEffects = Record<string, string>

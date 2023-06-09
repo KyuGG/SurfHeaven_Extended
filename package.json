@@ -1,17 +1,19 @@
 {
 	"scripts": {
-		"build": "npx webpack",
-		"watch": "npx webpack --watch --mode=production"
-	},
-	"devDependencies": {
-		"@types/react": "^18.2.7",
-		"@types/tampermonkey": "^4.0.10",
-		"ts-loader": "^9.4.3",
-		"typescript": "^5.0.4",
-		"webpack": "^5.84.1",
-		"webpack-cli": "^5.1.1"
+		"build": "ts-node esbuild.ts",
+		"watch": "ts-node esbuild.ts --watch"
 	},
 	"dependencies": {
-		"react": "^18.2.0"
+		"react": "^18.2.0",
+		"react-dom": "^18.2.0"
+	},
+	"devDependencies": {
+		"@types/node": "^20.2.5",
+		"@types/react-dom": "^18.2.4",
+		"@types/tampermonkey": "^4.0.10",
+		"esbuild": "0.17.19",
+		"esbuild-sass-plugin": "^2.9.0",
+		"ts-node": "^10.9.1",
+		"userscript-metadata-generator": "^0.2.3"
 	}
 }

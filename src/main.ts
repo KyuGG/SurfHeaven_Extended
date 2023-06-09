@@ -1,39 +1,18 @@
-// ==UserScript==
-// @name         SurfHeaven ranks Ext
-// @namespace    http://tampermonkey.net/
-// @version      4.2.16.2
-// @description  More stats and features for SurfHeaven.eu
-// @author       kalle, Link
-// @updateURL    https://github.com/Kalekki/SurfHeaven_Extended/raw/main/sh.user.js
-// @downloadURL  https://github.com/Kalekki/SurfHeaven_Extended/raw/main/sh.user.js
-// @require      https://cdnjs.cloudflare.com/ajax/libs/chartist/0.11.4/chartist.min.js
-// @match        https://surfheaven.eu/*
-// @icon         https://www.google.com/s2/favicons?domain=surfheaven.eu
-// @connect      raw.githubusercontent.com
-// @connect      surfheaven.eu
-// @connect      iloveur.mom
-// @grant        GM_xmlhttpRequest
-// @grant        GM_addStyle
-// @grant        GM.getValue
-// @grant        GM.setValue
-// @grant        GM_info
-// @license      MIT
-// ==/UserScript==
-
 import Settings from './types/settings.interface'
 import loadSettings, { settings_labels } from './loadSettings'
+import loadUserEffects from './loadUserEffects'
+import addLogo from './addLogo'
+import checkUpdates from './updateCheck'
+
 /*  
     Todo
     - Activity chart on profile page
     - (prettier) Rank threshold settings in servers page
     - user effects seem to disable hover div???
 */
-import loadUserEffects from './loadUserEffects'
-import addLogo from './addLogo'
 ;(async function () {
 	'use strict'
 
-	const VERSION = GM_info.script.version
 	var use_custom = await GM.getValue('sh_ranks_use_custom_id', false)
 	var custom_id = await GM.getValue(
 		'sh_ranks_custom_id',
@@ -160,7 +139,8 @@ import addLogo from './addLogo'
 		if (current_page == 'donate') {
 			// Gift vip
 			if (unsafeWindow.localStorage.getItem('gift_vip_steamid') != null) {
-				document.getElementById('authid').value =
+				const steamProfileLinkInput = document.getElementById('authid') as HTMLInputElement
+				steamProfileLinkInput.value =
 					'http://steamcommunity.com/profiles/' +
 					unsafeWindow.localStorage.getItem('gift_vip_steamid')
 				unsafeWindow.localStorage.removeItem('gift_vip_steamid')
@@ -170,67 +150,17 @@ import addLogo from './addLogo'
 	}
 
 	// Navbar crowded fix
-	if (document.getElementById('navbar').clientHeight > 60) {
+	if (document.getElementById('navbar')!.clientHeight > 60) {
 		make_navbar_compact()
 	}
 	window.addEventListener('resize', function () {
-		if (document.getElementById('navbar').clientHeight > 60) {
+		if (document.getElementById('navbar')!.clientHeight > 60) {
 			make_navbar_compact()
 		}
 	})
 
 	// Update check
-	if (settings.update_check) {
-		if (unsafeWindow.localStorage.getItem('update_last_checked') == null) {
-			unsafeWindow.localStorage.setItem('update_last_checked', Date.now())
-		} else if (
-			Date.now() - unsafeWindow.localStorage.getItem('update_last_checked') >
-			1000 * 60 * 5
-		) {
-			unsafeWindow.localStorage.setItem('update_last_checked', Date.now())
-			check_for_updates()
-		}
-	}
-
-	function check_for_updates() {
-		GM_xmlhttpRequest({
-			method: 'GET',
-			url: 'https://raw.githubusercontent.com/Kalekki/SurfHeaven_Extended/main/changelog.txt',
-			onload: function (response) {
-				if (response.status != 200) return
-				var latest_version = response.responseText.split('___')[1]
-				console.log('Current version: ' + VERSION + ' | Latest version: ' + latest_version)
-				if (latest_version != VERSION) {
-					let update_url =
-						'https://github.com/Kalekki/SurfHeaven_Extended/raw/main/sh.user.js'
-					let modal = document.createElement('div')
-					modal.innerHTML = `
-                    <div class="modal fade" id="update_modal" tabindex="-1" role="dialog" style="display: flex; z-index:99999">
-                    <div class="modal-dialog" role="document">
-                        <div class="modal-content">
-                            <div class="modal-body" style="padding: 1rem;">
-                                <h5 class="modal-title" style="margin-bottom:1rem;">SH Extended update available!</h5>
-                                <p>Version <span style="color:salmon;">${VERSION}</span> -> <span style="color: lightgreen">${latest_version}</span</p>
-                                <p style="color:white;">What's new:</p>
-                                <textarea readonly style="width:100%;height:80px; background-color:#21242a; color:white;">${
-									response.responseText.split('___')[2]
-								}</textarea>
-                            </div>
-                            <div class="modal-footer" style="padding:7px;">
-                                <small style="text-align: left;">You can disable this message in the settings.</small>
-                                <button type="button" class="btn btn-secondary btn-danger" data-dismiss="modal">Close</button>
-                                <a href="${update_url}" target="_blank" onclick="$('#update_modal').modal('hide');" class="btn btn-primary btn-success">Update</a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                    `
-					document.body.appendChild(modal)
-					$('#update_modal').modal('show')
-				}
-			},
-		})
-	}
+	checkUpdates(settings.update_check)
 
 	// Follow list
 	if (settings.follow_list) {

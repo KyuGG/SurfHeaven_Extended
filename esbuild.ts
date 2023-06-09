@@ -6,7 +6,7 @@ import metadata from './tampermonkeyMetadata'
 
 const isWatchMode = process.argv.includes('--watch')
 
-const ENTRY = './src/addLogo.ts'
+const ENTRY = './src/main.ts'
 
 const config: esbuild.BuildOptions = {
 	entryPoints: [ENTRY],

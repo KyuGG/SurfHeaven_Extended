@@ -3,6 +3,7 @@ import loadSettings, { settings_labels } from './loadSettings'
 import loadUserEffects from './loadUserEffects'
 import addLogo from './addLogo'
 import checkUpdates from './updateCheck'
+import OnlinePlayer, { Region } from './types/online-player.interface'
 
 /*  
     Todo
@@ -78,7 +79,7 @@ import checkUpdates from './updateCheck'
 		'#FFFFFF',
 	]
 
-	const AU_SERVERS = {
+	const AU_SERVERS: Record<number, string> = {
 		14: '51.161.199.33:27015',
 		15: '51.161.199.33:27016',
 		16: '51.161.199.33:27017',
@@ -164,7 +165,7 @@ import checkUpdates from './updateCheck'
 
 	// Follow list
 	if (settings.follow_list) {
-		const sidebar_div = document.querySelector('.navigation')
+		const sidebar_div = document.querySelector('.navigation')!
 		const follow_list_root_div = document.createElement('div')
 		const follow_list_row_div = document.createElement('div')
 		const follow_list_panel_div = document.createElement('div')
@@ -180,28 +181,19 @@ import checkUpdates from './updateCheck'
 		follow_list_panel_div.className = 'panel panel-filled'
 		follow_list_panel_body_div.className = 'panel-body'
 		follow_list_panel_body_div.id = 'follow_list'
-		follow_list_panel_body_div.style = 'padding: 5px;'
+		follow_list_panel_body_div.style.padding = '5px'
 
 		follow_list_root_div.appendChild(follow_list_row_div)
 		follow_list_row_div.appendChild(follow_list_panel_div)
 		follow_list_panel_div.appendChild(follow_list_panel_body_div)
 
-		make_request('https://api.surfheaven.eu/api/online/', data => {
-			let follow_list = get_follow_list()
-			let online_players = []
-			let followed_players = []
+		make_request('https://api.surfheaven.eu/api/online/', (onlinePlayers: OnlinePlayer[]) => {
+			const follow_list = get_follow_list()
+			const followed_players: OnlinePlayer[] = []
 			let friends_online = false
-			data.forEach(player => {
-				online_players.push([
-					player.steamid,
-					player.name,
-					player.server,
-					player.map,
-					player.region,
-				])
-			})
-			online_players.forEach(player => {
-				if (follow_list.includes(player[0])) {
+
+			onlinePlayers.forEach(player => {
+				if (follow_list.includes(player.steamid)) {
 					followed_players.push(player)
 					friends_online = true
 				}
@@ -213,21 +205,21 @@ import checkUpdates from './updateCheck'
 				follow_list_panel_body_div.appendChild(follow_list_item)
 			}
 
-			followed_players.sort(function (a, b) {
-				return a[2] - b[2]
-			})
+			followed_players.sort((player1, player2) => player1.server - player2.server)
 
 			followed_players.forEach(player => {
 				let follow_list_item = document.createElement('h5')
-				if (player[4] == 'AU') {
+				if (player.region === Region.AU) {
 					follow_list_item.innerHTML = `<a href="https://surfheaven.eu/player/${
-						player[0]
-					}">${player[1]}</a> in <a href="steam://connect/${
-						AU_SERVERS[player[2]]
-					}" title="${player[3]}" style="color:rgb(0,255,0)">#${player[2] - 13} (AU)</a>`
-				} else {
-					follow_list_item.innerHTML = `<a href="https://surfheaven.eu/player/${player[0]}">${player[1]}</a> in <a href="steam://connect/surf${player[2]}.surfheaven.eu" title="${player[3]}" style="color:rgb(0,255,0)">#${player[2]}</a>`
-				}
+						player.steamid
+					}">${player.name}</a> in <a href="steam://connect/${
+						AU_SERVERS[player.server]
+					}" title="${player.map}" style="color:rgb(0,255,0)">#${
+						player.server - 13
+					} (AU)</a>`
+				} else
+					follow_list_item.innerHTML = `<a href="https://surfheaven.eu/player/${player.steamid}">${player.name}</a> in <a href="steam://connect/surf${player.server}.surfheaven.eu" title="${player.map}" style="color:rgb(0,255,0)">#${player.server}</a>`
+
 				follow_list_panel_body_div.appendChild(follow_list_item)
 			})
 
@@ -239,7 +231,8 @@ import checkUpdates from './updateCheck'
 		})
 
 		// refresh follow list
-		const follow_list_refresh_interval = 60 * 1000
+		const MIN1 = 60 * 1000
+		const follow_list_refresh_interval = MIN1
 		setInterval(() => {
 			refresh_follow_list()
 		}, follow_list_refresh_interval)
@@ -374,10 +367,10 @@ import checkUpdates from './updateCheck'
 	}
 
 	// listening for clicks to add flags when tabulating through multi-page tables (top 100, reports etc.)
-	document.addEventListener('click', e => {
-		if (e.target.tagName == 'A' && current_page != 'servers') {
-			insert_flags_to_profiles()
-		}
+	document.addEventListener('click', evt => {
+		const target = evt.target as HTMLElement
+
+		if (target.tagName == 'A' && current_page != 'servers') insert_flags_to_profiles()
 	})
 
 	function format_date(time) {
@@ -641,7 +634,7 @@ import checkUpdates from './updateCheck'
 		}
 	}
 
-	function make_request(url, func) {
+	function make_request(url: string, func: Function) {
 		make_request_async(url).then(data => {
 			if (data) {
 				func(data)

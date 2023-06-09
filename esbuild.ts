@@ -1,6 +1,8 @@
 import * as esbuild from 'esbuild'
 import { sassPlugin } from 'esbuild-sass-plugin'
 
+import { userscriptMetadataGenerator } from 'userscript-metadata-generator'
+import metadata from './tampermonkeyMetadata'
 
 const isWatchMode = process.argv.includes('--watch')
 
@@ -12,7 +14,9 @@ const config: esbuild.BuildOptions = {
 	outfile: './dist/sh.user.js',
 	minify: !isWatchMode,
 	plugins: [sassPlugin({ type: 'style' })],
-	
+	banner: {
+		js: userscriptMetadataGenerator(metadata) + '\n',
+	},
 }
 
 async function watch() {

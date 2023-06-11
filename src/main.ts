@@ -6,6 +6,7 @@ import addLogo from './addLogo'
 import checkUpdates from './updateCheck'
 import { Region, OnlinePlayer } from './types/player.interface'
 import followList, { get_follow_list } from './followList'
+import hoverInfo from './hoverInfo'
 
 /*  
     Todo
@@ -109,7 +110,7 @@ async function main() {
 	checkUpdates(settings.update_check)
 
 	// Follow list
-	followList()
+	followList(settings.follow_list)
 
 	// listening for clicks to add flags when tabulating through multi-page tables (top 100, reports etc.)
 	document.addEventListener('click', evt => {
@@ -119,162 +120,7 @@ async function main() {
 	})
 
 	//Hover info
-	if (settings.hover_info) {
-		const hover_div = document.createElement('div')
-		hover_div.id = 'hover-div'
-		document.body.appendChild(hover_div)
-
-		let hover_timeout
-		let hover_length = 400 // ms to wait before showing hover info, cumulative with api response time
-
-		function fade_in(element) {
-			element.classList.add('show')
-		}
-		function fade_out(element) {
-			element.classList.remove('show')
-		}
-
-		document.addEventListener('mouseover', e => {
-			if (
-				e.target.tagName == 'A' &&
-				!e.target.href.includes('#') &&
-				e.target.parentElement.tagName != 'LI'
-			) {
-				hover_timeout = setTimeout(() => {
-					if (e.target.href.includes('player')) {
-						let steamid = e.target.href.split('/')[4]
-						make_request(
-							`https://api.surfheaven.eu/api/playerinfo/${steamid}`,
-							data => {
-								display_hover_info(data, 0, e)
-							}
-						)
-					} else if (e.target.href.includes('map')) {
-						let map_name = e.target.href.split('/')[4]
-						make_request(`https://api.surfheaven.eu/api/mapinfo/${map_name}`, data => {
-							display_hover_info(data, 1, e)
-						})
-					}
-				}, hover_length)
-			}
-		})
-		document.addEventListener('mouseout', e => {
-			if (e.target.tagName == 'A') {
-				clearTimeout(hover_timeout)
-			}
-			fade_out(hover_div)
-		})
-
-		function display_hover_info(data, type, e) {
-			let left_offset = 10
-			hover_div.style.top =
-				e.target.getBoundingClientRect().top + Math.floor(window.scrollY) + 'px'
-			hover_div.style.left = e.target.getBoundingClientRect().right + left_offset + 'px'
-			hover_div.style.paddingTop = '0px'
-			hover_div.style.paddingBottom = '0px'
-			hover_div.textContent = 'Loading...'
-			hover_div.style.zIndex = '99999'
-			fade_in(hover_div)
-
-			function format_time(time) {
-				return Math.floor(time / 3600) + '.' + Math.floor((time % 3600) / 60)
-			}
-			function format_points(points) {
-				// 4300 -> 4.3k
-				if (points < 1000) {
-					return points
-				} else {
-					return Math.floor(points / 1000) + '.' + Math.floor((points % 1000) / 100) + 'k'
-				}
-			}
-			// type = 0 -> player
-			// type = 1 -> map
-			if (type == 0) {
-				hover_div.style.backgroundColor = 'rgba(13,17,23,0.6)'
-				hover_div.style.backgroundImage = 'none'
-				hover_div.innerHTML = `<div class="row">
-                <div class="col-sm-5">
-                    <h5>Rank</h5>
-                    <h5>Points</h5>
-                    <h5>Playtime</h5>
-                    <h5>Last seen</h5>
-                </div>
-                <div class="col-sm-7">
-                    <h5>#${data[0].rank} (${create_flag(data[0].country_code)} #${
-					data[0].country_rank
-				})</h5>
-                    <h5>${format_points(data[0].points)} [${
-					(data[0].rankname == 'Custom'
-						? '#' + data[0].rank
-						: '<span style="color:' +
-						  GROUP_COLORS[GROUP_NAMES.indexOf(data[0].rankname)] +
-						  ';">' +
-						  data[0].rankname) + '</span>'
-				}]</h5>
-                    <h5>${format_time(data[0].playtime)}h</h5>
-                    <h5>${format_date(data[0].lastplay)}</h5>
-                </div>
-            </div>
-            `
-			}
-			if (type == 1) {
-				const img = new Image()
-				img.src = `https://github.com/Sayt123/SurfMapPics/raw/Maps-and-bonuses/csgo/${data[0].map}.jpg`
-
-				img.onload = function () {
-					hover_div.style.backgroundImage = `url(${img.src})`
-					hover_div.style.backgroundSize = 'cover'
-					hover_div.style.backgroundPosition = 'center'
-
-					hover_div.innerHTML = `
-                    <div class="row outlined text-center" style="min-width: 18vw; min-height: 18vh;">
-                        <h5>T${data[0].tier} ${data[0].type == 0 ? ' linear' : ' staged'} by ${
-						data[0].author
-					}</h5>
-                        <!--<h5>Added ${format_date(data[0].date_added)} / ${
-						data[0].completions
-					} completions</h5>-->
-                    </div>
-                `
-					hover_div.style.top =
-						e.target.getBoundingClientRect().top +
-						Math.floor(window.scrollY) -
-						hover_div.getBoundingClientRect().height / 2 +
-						'px'
-				}
-
-				img.onerror = function () {
-					hover_div.style.backgroundColor = 'rgba(13,17,23,0.6)'
-					hover_div.style.backgroundImage = 'none'
-					hover_div.innerHTML = `<div class="row">
-                    <div class="col-sm-4">
-                        <h5>Type</h5>
-                        <h5>Author</h5>
-                        <h5>Added</h5>
-                        <h5>Finishes</h5>
-                    </div>
-                    <div class="col-sm-8">
-                        <h5>T${data[0].tier} ${data[0].type == 0 ? ' linear' : ' staged'}</h5>
-                        <h5>${data[0].author}</h5>
-                        <h5>${format_date(data[0].date_added)}</h5>
-                        <h5>${data[0].completions}</h5>
-                    </div>
-                </div>`
-				}
-
-				hover_div.style.backgroundImage = 'none'
-				hover_div.innerHTML = `<div class="row">
-                <h5>Loading...</h5>
-                </div>`
-			}
-			hover_div.style.top =
-				e.target.getBoundingClientRect().top +
-				Math.floor(window.scrollY) -
-				hover_div.getBoundingClientRect().height / 2 +
-				e.target.getBoundingClientRect().height / 2 +
-				'px'
-		}
-	}
+	hoverInfo(settings.hover_info)
 
 	const navbar = document.querySelector('.nav') as HTMLUListElement
 	const li_wrapper = document.createElement('li')
@@ -491,7 +337,9 @@ async function main() {
 			var ctop_title_text = ctop_panel_heading_div.querySelector('span')
 			var ctop_dropdown = document.createElement('select')
 			ctop_dropdown.className = 'form-control'
-			ctop_dropdown.style = 'width: 100px; display: inline; margin-right: 10px;'
+			ctop_dropdown.style.width = '100px'
+			ctop_dropdown.style.display = 'inline'
+			ctop_dropdown.style.marginRight = '10px'
 			ctop_dropdown.id = 'ctop_dropdown'
 			for (var i = 0; i < countries.length; i++) {
 				var ctop_option = document.createElement('option')
@@ -600,13 +448,6 @@ async function main() {
 			setTimeout(func, timeout)
 			resolve()
 		})
-	}
-
-	function create_flag(country) {
-		var flag = document.createElement('img')
-		flag.src = country_code_to_flag_url(country)
-		flag.style = 'margin-right: 2px; margin-bottom: 2px; width: 23px; height:14px;'
-		return flag.outerHTML
 	}
 
 	function fetch_map_rank(map_name) {
@@ -970,280 +811,7 @@ async function main() {
 		})
 	}
 
-	function country_code_to_flag_url(country_code) {
-		var url = (
-			'https://surfheaven.eu/flags/' +
-			countryISOMapping(country_code) +
-			'.svg'
-		).toLowerCase()
-		if (url == 'https://surfheaven.eu/flags/undefined.svg')
-			url = 'https://upload.wikimedia.org/wikipedia/commons/2/2a/Flag_of_None.svg'
-		return url
-	}
-
-	function countryISOMapping(country_code, reverse = false) {
-		// https://github.com/vtex/country-iso-3-to-2/blob/master/index.js
-		var countryISOMap = {
-			AFG: 'AF',
-			ALA: 'AX',
-			ALB: 'AL',
-			DZA: 'DZ',
-			ASM: 'AS',
-			AND: 'AD',
-			AGO: 'AO',
-			AIA: 'AI',
-			ATA: 'AQ',
-			ATG: 'AG',
-			ARG: 'AR',
-			ARM: 'AM',
-			ABW: 'AW',
-			AUS: 'AU',
-			AUT: 'AT',
-			AZE: 'AZ',
-			BHS: 'BS',
-			BHR: 'BH',
-			BGD: 'BD',
-			BRB: 'BB',
-			BLR: 'BY',
-			BEL: 'BE',
-			BLZ: 'BZ',
-			BEN: 'BJ',
-			BMU: 'BM',
-			BTN: 'BT',
-			BOL: 'BO',
-			BES: 'BQ',
-			BIH: 'BA',
-			BWA: 'BW',
-			BVT: 'BV',
-			BRA: 'BR',
-			VGB: 'VG',
-			IOT: 'IO',
-			BRN: 'BN',
-			BGR: 'BG',
-			BFA: 'BF',
-			BDI: 'BI',
-			KHM: 'KH',
-			CMR: 'CM',
-			CAN: 'CA',
-			CPV: 'CV',
-			CYM: 'KY',
-			CAF: 'CF',
-			TCD: 'TD',
-			CHL: 'CL',
-			CHN: 'CN',
-			HKG: 'HK',
-			MAC: 'MO',
-			CXR: 'CX',
-			CCK: 'CC',
-			COL: 'CO',
-			COM: 'KM',
-			COG: 'CG',
-			COD: 'CD',
-			COK: 'CK',
-			CRI: 'CR',
-			CIV: 'CI',
-			HRV: 'HR',
-			CUB: 'CU',
-			CUW: 'CW',
-			CYP: 'CY',
-			CZE: 'CZ',
-			DNK: 'DK',
-			DJI: 'DJ',
-			DMA: 'DM',
-			DOM: 'DO',
-			ECU: 'EC',
-			EGY: 'EG',
-			SLV: 'SV',
-			GNQ: 'GQ',
-			ERI: 'ER',
-			EST: 'EE',
-			ETH: 'ET',
-			FLK: 'FK',
-			FRO: 'FO',
-			FJI: 'FJ',
-			FIN: 'FI',
-			FRA: 'FR',
-			GUF: 'GF',
-			PYF: 'PF',
-			ATF: 'TF',
-			GAB: 'GA',
-			GMB: 'GM',
-			GEO: 'GE',
-			DEU: 'DE',
-			GHA: 'GH',
-			GIB: 'GI',
-			GRC: 'GR',
-			GRL: 'GL',
-			GRD: 'GD',
-			GLP: 'GP',
-			GUM: 'GU',
-			GTM: 'GT',
-			GGY: 'GG',
-			GIN: 'GN',
-			GNB: 'GW',
-			GUY: 'GY',
-			HTI: 'HT',
-			HMD: 'HM',
-			VAT: 'VA',
-			HND: 'HN',
-			HUN: 'HU',
-			ISL: 'IS',
-			IND: 'IN',
-			IDN: 'ID',
-			IRN: 'IR',
-			IRQ: 'IQ',
-			IRL: 'IE',
-			IMN: 'IM',
-			ISR: 'IL',
-			ITA: 'IT',
-			JAM: 'JM',
-			JPN: 'JP',
-			JEY: 'JE',
-			JOR: 'JO',
-			KAZ: 'KZ',
-			KEN: 'KE',
-			KIR: 'KI',
-			PRK: 'KP',
-			KOR: 'KR',
-			KWT: 'KW',
-			KGZ: 'KG',
-			LAO: 'LA',
-			LVA: 'LV',
-			LBN: 'LB',
-			LSO: 'LS',
-			LBR: 'LR',
-			LBY: 'LY',
-			LIE: 'LI',
-			LTU: 'LT',
-			LUX: 'LU',
-			MKD: 'MK',
-			MDG: 'MG',
-			MWI: 'MW',
-			MYS: 'MY',
-			MDV: 'MV',
-			MLI: 'ML',
-			MLT: 'MT',
-			MHL: 'MH',
-			MTQ: 'MQ',
-			MRT: 'MR',
-			MUS: 'MU',
-			MYT: 'YT',
-			MEX: 'MX',
-			FSM: 'FM',
-			MDA: 'MD',
-			MCO: 'MC',
-			MNG: 'MN',
-			MNE: 'ME',
-			MSR: 'MS',
-			MAR: 'MA',
-			MOZ: 'MZ',
-			MMR: 'MM',
-			NAM: 'NA',
-			NRU: 'NR',
-			NPL: 'NP',
-			NLD: 'NL',
-			ANT: 'AN',
-			NCL: 'NC',
-			NZL: 'NZ',
-			NIC: 'NI',
-			NER: 'NE',
-			NGA: 'NG',
-			NIU: 'NU',
-			NFK: 'NF',
-			MNP: 'MP',
-			NOR: 'NO',
-			OMN: 'OM',
-			PAK: 'PK',
-			PLW: 'PW',
-			PSE: 'PS',
-			PAN: 'PA',
-			PNG: 'PG',
-			PRY: 'PY',
-			PER: 'PE',
-			PHL: 'PH',
-			PCN: 'PN',
-			POL: 'PL',
-			PRT: 'PT',
-			PRI: 'PR',
-			QAT: 'QA',
-			REU: 'RE',
-			ROU: 'RO',
-			RUS: 'RU',
-			RWA: 'RW',
-			BLM: 'BL',
-			SHN: 'SH',
-			KNA: 'KN',
-			LCA: 'LC',
-			MAF: 'MF',
-			SPM: 'PM',
-			VCT: 'VC',
-			WSM: 'WS',
-			SMR: 'SM',
-			STP: 'ST',
-			SAU: 'SA',
-			SEN: 'SN',
-			SRB: 'RS',
-			SYC: 'SC',
-			SLE: 'SL',
-			SGP: 'SG',
-			SXM: 'SX',
-			SVK: 'SK',
-			SVN: 'SI',
-			SLB: 'SB',
-			SOM: 'SO',
-			ZAF: 'ZA',
-			SGS: 'GS',
-			SSD: 'SS',
-			ESP: 'ES',
-			LKA: 'LK',
-			SDN: 'SD',
-			SUR: 'SR',
-			SJM: 'SJ',
-			SWZ: 'SZ',
-			SWE: 'SE',
-			CHE: 'CH',
-			SYR: 'SY',
-			TWN: 'TW',
-			TJK: 'TJ',
-			TZA: 'TZ',
-			THA: 'TH',
-			TLS: 'TL',
-			TGO: 'TG',
-			TKL: 'TK',
-			TON: 'TO',
-			TTO: 'TT',
-			TUN: 'TN',
-			TUR: 'TR',
-			TKM: 'TM',
-			TCA: 'TC',
-			TUV: 'TV',
-			UGA: 'UG',
-			UKR: 'UA',
-			ARE: 'AE',
-			GBR: 'GB',
-			USA: 'US',
-			UMI: 'UM',
-			URY: 'UY',
-			UZB: 'UZ',
-			VUT: 'VU',
-			VEN: 'VE',
-			VNM: 'VN',
-			VIR: 'VI',
-			WLF: 'WF',
-			ESH: 'EH',
-			YEM: 'YE',
-			ZMB: 'ZM',
-			ZWE: 'ZW',
-			XKX: 'XK',
-			XK: 'XK',
-		}
-		if (reverse) {
-			return Object.keys(countryISOMap).find(key => countryISOMap[key] === country_code)
-		}
-		return countryISOMap[country_code]
-	}
-
-	function fetch_ranks(id) {
+	function fetch_ranks(id: string) {
 		make_request('https://api.surfheaven.eu/api/records/' + id + '/', records => {
 			make_request('https://api.surfheaven.eu/api/servers', servers => {
 				if (Array.isArray(servers)) {
@@ -3547,7 +3115,7 @@ async function main() {
 				regex = `^${tag_regex_pattern}.*$`
 				table.column(1).search(regex, true).draw()
 			}
-			function append_to_last_row(tag) {
+			function append_to_last_row(tag: HTMLElement) {
 				let max_tags_per_row = 12
 				let last_row = tag_links.lastElementChild
 				if (last_row == null || last_row.childElementCount == max_tags_per_row) {
@@ -3630,7 +3198,7 @@ async function main() {
 		show_overlay_window('Map tags', root_div)
 	}
 
-	function open_tag_selection_window(map_name, from_map_page = false) {
+	function open_tag_selection_window(map_name: string, from_map_page = false) {
 		if (document.getElementById('tag_selection_modal') != null) {
 			$('#tag_selection_modal').modal('show')
 		} else {
@@ -4658,6 +4226,286 @@ export function show_overlay_window(window_title: string, element_to_append: Ele
 	overlay.appendChild(inner_panel)
 	inner_panel.appendChild(element_to_append)
 	document.body.appendChild(overlay)
+}
+
+export function create_flag(country: string) {
+	var flag = document.createElement('img')
+	flag.src = country_code_to_flag_url(country)
+	flag.style = 'margin-right: 2px; margin-bottom: 2px; width: 23px; height:14px;'
+	return flag.outerHTML
+}
+
+function country_code_to_flag_url(country_code: string) {
+	var url = (
+		'https://surfheaven.eu/flags/' +
+		countryISOMapping(country_code) +
+		'.svg'
+	).toLowerCase()
+	if (url === 'https://surfheaven.eu/flags/undefined.svg')
+		url = 'https://upload.wikimedia.org/wikipedia/commons/2/2a/Flag_of_None.svg'
+	return url
+}
+
+function countryISOMapping(country_code: string, reverse = false) {
+	// https://github.com/vtex/country-iso-3-to-2/blob/master/index.js
+	var countryISOMap: Record<string, string> = {
+		AFG: 'AF',
+		ALA: 'AX',
+		ALB: 'AL',
+		DZA: 'DZ',
+		ASM: 'AS',
+		AND: 'AD',
+		AGO: 'AO',
+		AIA: 'AI',
+		ATA: 'AQ',
+		ATG: 'AG',
+		ARG: 'AR',
+		ARM: 'AM',
+		ABW: 'AW',
+		AUS: 'AU',
+		AUT: 'AT',
+		AZE: 'AZ',
+		BHS: 'BS',
+		BHR: 'BH',
+		BGD: 'BD',
+		BRB: 'BB',
+		BLR: 'BY',
+		BEL: 'BE',
+		BLZ: 'BZ',
+		BEN: 'BJ',
+		BMU: 'BM',
+		BTN: 'BT',
+		BOL: 'BO',
+		BES: 'BQ',
+		BIH: 'BA',
+		BWA: 'BW',
+		BVT: 'BV',
+		BRA: 'BR',
+		VGB: 'VG',
+		IOT: 'IO',
+		BRN: 'BN',
+		BGR: 'BG',
+		BFA: 'BF',
+		BDI: 'BI',
+		KHM: 'KH',
+		CMR: 'CM',
+		CAN: 'CA',
+		CPV: 'CV',
+		CYM: 'KY',
+		CAF: 'CF',
+		TCD: 'TD',
+		CHL: 'CL',
+		CHN: 'CN',
+		HKG: 'HK',
+		MAC: 'MO',
+		CXR: 'CX',
+		CCK: 'CC',
+		COL: 'CO',
+		COM: 'KM',
+		COG: 'CG',
+		COD: 'CD',
+		COK: 'CK',
+		CRI: 'CR',
+		CIV: 'CI',
+		HRV: 'HR',
+		CUB: 'CU',
+		CUW: 'CW',
+		CYP: 'CY',
+		CZE: 'CZ',
+		DNK: 'DK',
+		DJI: 'DJ',
+		DMA: 'DM',
+		DOM: 'DO',
+		ECU: 'EC',
+		EGY: 'EG',
+		SLV: 'SV',
+		GNQ: 'GQ',
+		ERI: 'ER',
+		EST: 'EE',
+		ETH: 'ET',
+		FLK: 'FK',
+		FRO: 'FO',
+		FJI: 'FJ',
+		FIN: 'FI',
+		FRA: 'FR',
+		GUF: 'GF',
+		PYF: 'PF',
+		ATF: 'TF',
+		GAB: 'GA',
+		GMB: 'GM',
+		GEO: 'GE',
+		DEU: 'DE',
+		GHA: 'GH',
+		GIB: 'GI',
+		GRC: 'GR',
+		GRL: 'GL',
+		GRD: 'GD',
+		GLP: 'GP',
+		GUM: 'GU',
+		GTM: 'GT',
+		GGY: 'GG',
+		GIN: 'GN',
+		GNB: 'GW',
+		GUY: 'GY',
+		HTI: 'HT',
+		HMD: 'HM',
+		VAT: 'VA',
+		HND: 'HN',
+		HUN: 'HU',
+		ISL: 'IS',
+		IND: 'IN',
+		IDN: 'ID',
+		IRN: 'IR',
+		IRQ: 'IQ',
+		IRL: 'IE',
+		IMN: 'IM',
+		ISR: 'IL',
+		ITA: 'IT',
+		JAM: 'JM',
+		JPN: 'JP',
+		JEY: 'JE',
+		JOR: 'JO',
+		KAZ: 'KZ',
+		KEN: 'KE',
+		KIR: 'KI',
+		PRK: 'KP',
+		KOR: 'KR',
+		KWT: 'KW',
+		KGZ: 'KG',
+		LAO: 'LA',
+		LVA: 'LV',
+		LBN: 'LB',
+		LSO: 'LS',
+		LBR: 'LR',
+		LBY: 'LY',
+		LIE: 'LI',
+		LTU: 'LT',
+		LUX: 'LU',
+		MKD: 'MK',
+		MDG: 'MG',
+		MWI: 'MW',
+		MYS: 'MY',
+		MDV: 'MV',
+		MLI: 'ML',
+		MLT: 'MT',
+		MHL: 'MH',
+		MTQ: 'MQ',
+		MRT: 'MR',
+		MUS: 'MU',
+		MYT: 'YT',
+		MEX: 'MX',
+		FSM: 'FM',
+		MDA: 'MD',
+		MCO: 'MC',
+		MNG: 'MN',
+		MNE: 'ME',
+		MSR: 'MS',
+		MAR: 'MA',
+		MOZ: 'MZ',
+		MMR: 'MM',
+		NAM: 'NA',
+		NRU: 'NR',
+		NPL: 'NP',
+		NLD: 'NL',
+		ANT: 'AN',
+		NCL: 'NC',
+		NZL: 'NZ',
+		NIC: 'NI',
+		NER: 'NE',
+		NGA: 'NG',
+		NIU: 'NU',
+		NFK: 'NF',
+		MNP: 'MP',
+		NOR: 'NO',
+		OMN: 'OM',
+		PAK: 'PK',
+		PLW: 'PW',
+		PSE: 'PS',
+		PAN: 'PA',
+		PNG: 'PG',
+		PRY: 'PY',
+		PER: 'PE',
+		PHL: 'PH',
+		PCN: 'PN',
+		POL: 'PL',
+		PRT: 'PT',
+		PRI: 'PR',
+		QAT: 'QA',
+		REU: 'RE',
+		ROU: 'RO',
+		RUS: 'RU',
+		RWA: 'RW',
+		BLM: 'BL',
+		SHN: 'SH',
+		KNA: 'KN',
+		LCA: 'LC',
+		MAF: 'MF',
+		SPM: 'PM',
+		VCT: 'VC',
+		WSM: 'WS',
+		SMR: 'SM',
+		STP: 'ST',
+		SAU: 'SA',
+		SEN: 'SN',
+		SRB: 'RS',
+		SYC: 'SC',
+		SLE: 'SL',
+		SGP: 'SG',
+		SXM: 'SX',
+		SVK: 'SK',
+		SVN: 'SI',
+		SLB: 'SB',
+		SOM: 'SO',
+		ZAF: 'ZA',
+		SGS: 'GS',
+		SSD: 'SS',
+		ESP: 'ES',
+		LKA: 'LK',
+		SDN: 'SD',
+		SUR: 'SR',
+		SJM: 'SJ',
+		SWZ: 'SZ',
+		SWE: 'SE',
+		CHE: 'CH',
+		SYR: 'SY',
+		TWN: 'TW',
+		TJK: 'TJ',
+		TZA: 'TZ',
+		THA: 'TH',
+		TLS: 'TL',
+		TGO: 'TG',
+		TKL: 'TK',
+		TON: 'TO',
+		TTO: 'TT',
+		TUN: 'TN',
+		TUR: 'TR',
+		TKM: 'TM',
+		TCA: 'TC',
+		TUV: 'TV',
+		UGA: 'UG',
+		UKR: 'UA',
+		ARE: 'AE',
+		GBR: 'GB',
+		USA: 'US',
+		UMI: 'UM',
+		URY: 'UY',
+		UZB: 'UZ',
+		VUT: 'VU',
+		VEN: 'VE',
+		VNM: 'VN',
+		VIR: 'VI',
+		WLF: 'WF',
+		ESH: 'EH',
+		YEM: 'YE',
+		ZMB: 'ZM',
+		ZWE: 'ZW',
+		XKX: 'XK',
+		XK: 'XK',
+	}
+	if (reverse) {
+		return Object.keys(countryISOMap).find(key => countryISOMap[key] === country_code)
+	}
+	return countryISOMap[country_code]
 }
 
 GM_addStyle(`

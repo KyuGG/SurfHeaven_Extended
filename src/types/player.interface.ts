@@ -21,7 +21,7 @@ export interface PlayerInfo extends Player {
 	playtime: number
 	points: number
 	rank: number
-	rankname: string | null | null
+	rankname: string
 	totalloc: string
 	totalspec: string
 	vip: number

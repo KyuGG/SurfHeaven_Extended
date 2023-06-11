@@ -1,3 +1,4 @@
+import { GroupName } from './../constants'
 export interface Player {
 	name: string
 	steamid: string
@@ -21,7 +22,7 @@ export interface PlayerInfo extends Player {
 	playtime: number
 	points: number
 	rank: number
-	rankname: string
+	rankname: GroupName | 'Custom'
 	totalloc: string
 	totalspec: string
 	vip: number

@@ -23,7 +23,9 @@ export const GROUP_NAMES = [
 	'Burrito',
 	'Calzone',
 	'New',
-]
+] as const
+
+export type GroupName = typeof GROUP_NAMES[number];
 
 export const GROUP_COLORS = [
 	'gold',

@@ -1,9 +1,11 @@
+import { PlayerInfo } from './types/player.interface'
 import Settings from './types/settings.interface'
 import loadSettings, { settings_labels } from './loadSettings'
 import loadUserEffects from './loadUserEffects'
 import addLogo from './addLogo'
 import checkUpdates from './updateCheck'
-import OnlinePlayer, { Region } from './types/online-player.interface'
+import { Region, OnlinePlayer } from './types/player.interface'
+import followList, { get_follow_list } from './followList'
 
 /*  
     Todo
@@ -11,84 +13,27 @@ import OnlinePlayer, { Region } from './types/online-player.interface'
     - (prettier) Rank threshold settings in servers page
     - user effects seem to disable hover div???
 */
-;(async function () {
+
+let api_call_count = 0
+var use_custom = await GM.getValue('sh_ranks_use_custom_id', false)
+var custom_id = await GM.getValue(
+	'sh_ranks_custom_id',
+	unsafeWindow.localStorage.getItem('cached_id')
+)
+let showed_id_prompt = false
+var current_page = ''
+var url_path = window.location.pathname.split('/')
+
+var map_completions = {}
+var map_types = {}
+var map_tiers = {}
+let map_dates = {}
+var bonus_completions = {}
+
+async function main() {
 	'use strict'
 
-	var use_custom = await GM.getValue('sh_ranks_use_custom_id', false)
-	var custom_id = await GM.getValue(
-		'sh_ranks_custom_id',
-		unsafeWindow.localStorage.getItem('cached_id')
-	)
-	let showed_id_prompt = false
-	var current_page = ''
-	var url_path = window.location.pathname.split('/')
-	var api_call_count = 0
-	var map_completions = {}
-	var map_types = {}
-	var map_tiers = {}
-	let map_dates = {}
-	var bonus_completions = {}
-
 	// colors are approximate and might be wrong, let me know
-	const GROUP_THRESHOLDS = [
-		1, 2, 3, 10, 25, 50, 75, 100, 150, 250, 500, 750, 1000, 1500, 2000, 3000, 6000, 15000,
-		25000,
-	]
-	const GROUP_NAMES = [
-		'#1',
-		'#2',
-		'#3',
-		'Master',
-		'Elite',
-		'Veteran',
-		'Expert',
-		'Pro',
-		'TheSteve',
-		'Hotshot',
-		'Skilled',
-		'Intermediate',
-		'Casual',
-		'Amateur',
-		'Regular',
-		'Potato',
-		'Beginner',
-		'Burrito',
-		'Calzone',
-		'New',
-	]
-	const GROUP_COLORS = [
-		'gold',
-		'gold',
-		'gold',
-		'#b57fe5',
-		'red',
-		'#d731eb',
-		'#6297d1',
-		'#6297d1',
-		'#E94A4B',
-		'#55ff4b',
-		'#aef25d',
-		'#ad8adc',
-		'#ebe58d',
-		'#b4c5d9',
-		'#6297d1',
-		'#dfa746',
-		'#ccccd4',
-		'#649ad8',
-		'#ccccd4',
-		'#FFFFFF',
-	]
-
-	const AU_SERVERS: Record<number, string> = {
-		14: '51.161.199.33:27015',
-		15: '51.161.199.33:27016',
-		16: '51.161.199.33:27017',
-		17: '51.161.199.33:27018',
-		18: '51.161.199.33:27019',
-		19: '51.161.199.33:27020',
-		20: '51.161.199.33:27021',
-		21: '51.161.199.33:27022',
-	}
 
 	// SETTINGS
 	const settings = loadSettings()
@@ -164,207 +109,7 @@ import OnlinePlayer, { Region } from './types/online-player.interface'
 	checkUpdates(settings.update_check)
 
 	// Follow list
-	if (settings.follow_list) {
-		const sidebar_div = document.querySelector('.navigation')!
-		const follow_list_root_div = document.createElement('div')
-		const follow_list_row_div = document.createElement('div')
-		const follow_list_panel_div = document.createElement('div')
-		const follow_list_panel_body_div = document.createElement('div')
-		const follow_h5 = document.createElement('h5')
-
-		follow_h5.className = 'text-center'
-		follow_h5.innerHTML = "<a href='#' style='color:white;'>FOLLOWED PLAYERS</a>"
-		follow_h5.addEventListener('click', follow_list_manager)
-		follow_h5.classList.add('text-white')
-		follow_list_root_div.className = 'row-recentactivity'
-		follow_list_row_div.className = 'col-sm-12'
-		follow_list_panel_div.className = 'panel panel-filled'
-		follow_list_panel_body_div.className = 'panel-body'
-		follow_list_panel_body_div.id = 'follow_list'
-		follow_list_panel_body_div.style.padding = '5px'
-
-		follow_list_root_div.appendChild(follow_list_row_div)
-		follow_list_row_div.appendChild(follow_list_panel_div)
-		follow_list_panel_div.appendChild(follow_list_panel_body_div)
-
-		make_request('https://api.surfheaven.eu/api/online/', (onlinePlayers: OnlinePlayer[]) => {
-			const follow_list = get_follow_list()
-			const followed_players: OnlinePlayer[] = []
-			let friends_online = false
-
-			onlinePlayers.forEach(player => {
-				if (follow_list.includes(player.steamid)) {
-					followed_players.push(player)
-					friends_online = true
-				}
-			})
-
-			if (!friends_online) {
-				let follow_list_item = document.createElement('h5')
-				follow_list_item.innerHTML = 'No friends online :('
-				follow_list_panel_body_div.appendChild(follow_list_item)
-			}
-
-			followed_players.sort((player1, player2) => player1.server - player2.server)
-
-			followed_players.forEach(player => {
-				let follow_list_item = document.createElement('h5')
-				if (player.region === Region.AU) {
-					follow_list_item.innerHTML = `<a href="https://surfheaven.eu/player/${
-						player.steamid
-					}">${player.name}</a> in <a href="steam://connect/${
-						AU_SERVERS[player.server]
-					}" title="${player.map}" style="color:rgb(0,255,0)">#${
-						player.server - 13
-					} (AU)</a>`
-				} else
-					follow_list_item.innerHTML = `<a href="https://surfheaven.eu/player/${player.steamid}">${player.name}</a> in <a href="steam://connect/surf${player.server}.surfheaven.eu" title="${player.map}" style="color:rgb(0,255,0)">#${player.server}</a>`
-
-				follow_list_panel_body_div.appendChild(follow_list_item)
-			})
-
-			if (follow_list != null && follow_list[0] != '') {
-				sidebar_div.insertBefore(follow_list_root_div, sidebar_div.firstChild)
-				sidebar_div.insertBefore(follow_h5, sidebar_div.firstChild)
-			}
-			insert_flags_to_profiles() // needed to be called again to get the flags on the follow list
-		})
-
-		// refresh follow list
-		const MIN1 = 60 * 1000
-		const follow_list_refresh_interval = MIN1
-		setInterval(() => {
-			refresh_follow_list()
-		}, follow_list_refresh_interval)
-	} else {
-		insert_flags_to_profiles()
-	}
-
-	function follow_list_manager() {
-		let follow_list = get_follow_list()
-		const follow_list_root = document.createElement('div')
-		follow_list_root.style.overflowY = 'scroll'
-		follow_list_root.style.maxHeight = '600px'
-
-		for (let i = 0; i < follow_list.length; i++) {
-			make_request(`https://api.surfheaven.eu/api/playerinfo/${follow_list[i]}`, data => {
-				let follow_list_item = document.createElement('div')
-				follow_list_item.style =
-					'white-space: nowrap; overflow: hidden; text-overflow: ellipsis;'
-
-				let name = data[0].name
-				let last_online = data[0].lastplay
-
-				const profile_link = document.createElement('a')
-				profile_link.href = `https://surfheaven.eu/player/${follow_list[i]}`
-				profile_link.innerHTML = name != '' ? name : follow_list[i]
-				profile_link.style = 'width:220px; float: left;'
-				const last_online_span = document.createElement('span')
-				last_online_span.style = 'float: right;'
-				last_online_span.innerHTML = `Last play ${format_date(last_online)} `
-				last_online_span.setAttribute('data-last-online', last_online) // for sorting
-
-				const unfollow_button = document.createElement('button')
-				unfollow_button.className = 'btn btn-danger btn-xs float-right'
-				unfollow_button.style.marginTop = '1px'
-				unfollow_button.style.marginLeft = '1rem'
-				unfollow_button.style.marginRight = '0.5rem'
-				unfollow_button.style.marginBottom = '1px'
-				unfollow_button.innerHTML = 'Unfollow'
-				unfollow_button.onclick = () => {
-					follow_list_root.removeChild(follow_list_item)
-					follow_user(follow_list[i])
-				}
-
-				follow_list_item.appendChild(profile_link)
-				last_online_span.appendChild(unfollow_button)
-				follow_list_item.appendChild(last_online_span)
-				follow_list_root.appendChild(follow_list_item)
-
-				insert_flags_to_profiles()
-				if (follow_list_root.querySelectorAll('div').length == follow_list.length) {
-					let follow_list_items = follow_list_root.children
-					let follow_list_items_array = []
-					for (let j = 0; j < follow_list_items.length; j++) {
-						follow_list_items_array.push(follow_list_items[j])
-					}
-					follow_list_items_array.sort((a, b) => {
-						let a_last_online = a.querySelector('span').getAttribute('data-last-online')
-						let b_last_online = b.querySelector('span').getAttribute('data-last-online')
-						return new Date(b_last_online) - new Date(a_last_online)
-					})
-					while (follow_list_root.firstChild) {
-						follow_list_root.removeChild(follow_list_root.firstChild)
-					}
-					follow_list_items_array.forEach((item, index) => {
-						follow_list_root.appendChild(item)
-						if (index % 2 == 0) {
-							item.style.backgroundColor = '#19202B'
-						}
-					})
-					insert_flags_to_profiles()
-				}
-			})
-		}
-		show_overlay_window('Followed players', follow_list_root)
-	}
-
-	function refresh_follow_list() {
-		console.log('Refreshing follow list')
-		let follow_list = get_follow_list()
-		let follow_list_panel_body_div = document.querySelector(
-			'div.row-recentactivity:nth-child(2) > div:nth-child(1) > div:nth-child(1) > div:nth-child(1)'
-		)
-		if (follow_list != null && follow_list[0] != '') {
-			make_request('https://api.surfheaven.eu/api/online/', data => {
-				let online_players = []
-				let friends_online = false
-				data.forEach(player => {
-					online_players.push([
-						player.steamid,
-						player.name,
-						player.server,
-						player.map,
-						player.region,
-					])
-				})
-				online_players.forEach(player => {
-					if (follow_list.includes(player[0])) {
-						friends_online = true
-					}
-				})
-				online_players.sort((a, b) => {
-					return a[2] - b[2]
-				})
-				if (friends_online) {
-					follow_list_panel_body_div.innerHTML = ''
-					online_players.forEach(player => {
-						if (follow_list.includes(player[0])) {
-							let follow_list_item = document.createElement('h5')
-							if (player[4] == 'AU') {
-								follow_list_item.innerHTML = `<a href="https://surfheaven.eu/player/${
-									player[0]
-								}">${player[1]}</a> in <a href="steam://connect/${
-									AU_SERVERS[player[2]]
-								}" title="${player[3]}" style="color:rgb(0,255,0)">#${
-									player[2] - 13
-								} (AU)</a>`
-							} else {
-								follow_list_item.innerHTML = `<a href="https://surfheaven.eu/player/${player[0]}">${player[1]}</a> in <a href="steam://connect/surf${player[2]}.surfheaven.eu" title="${player[3]}" style="color:rgb(0,255,0)">#${player[2]}</a>`
-							}
-							follow_list_panel_body_div.appendChild(follow_list_item)
-						}
-					})
-					insert_flags_to_profiles()
-				} else {
-					follow_list_panel_body_div.innerHTML = ''
-					let follow_list_item = document.createElement('h5')
-					follow_list_item.innerHTML = 'No friends online :('
-					follow_list_panel_body_div.appendChild(follow_list_item)
-				}
-			})
-		}
-	}
+	followList()
 
 	// listening for clicks to add flags when tabulating through multi-page tables (top 100, reports etc.)
 	document.addEventListener('click', evt => {
@@ -372,28 +117,6 @@ import OnlinePlayer, { Region } from './types/online-player.interface'
 
 		if (target.tagName == 'A' && current_page != 'servers') insert_flags_to_profiles()
 	})
-
-	function format_date(time) {
-		let today = new Date()
-		let date = new Date(time)
-		let diff = today - date
-		let days = Math.floor(diff / (1000 * 60 * 60 * 24))
-		let minutes = Math.floor(diff / (1000 * 60))
-		if (days == 0 && minutes < 60) {
-			return minutes + ' minutes ago'
-		} else if (days == 0 && minutes >= 60) {
-			let hours = Math.floor(minutes / 60)
-			minutes -= hours * 60
-			return hours + 'h ' + minutes + 'm ago'
-		} else if (days == 1) {
-			return 'Yesterday'
-		} else if (days < 7) {
-			return days + 'd ago'
-		} else {
-			let month = date.toLocaleString('default', { month: 'short' })
-			return month + ' ' + date.getDate() + ', ' + date.getFullYear()
-		}
-	}
 
 	//Hover info
 	if (settings.hover_info) {
@@ -568,82 +291,6 @@ import OnlinePlayer, { Region } from './types/online-player.interface'
 	map_tag_link.addEventListener('click', open_map_tag_menu)
 	navbar.insertBefore(map_tag_li, navbar.children[4])
 	navbar.insertBefore(li_wrapper, navbar.children[5])
-
-	function show_overlay_window(window_title, element_to_append) {
-		const overlay = document.createElement('div')
-		overlay.id = 'overlay'
-		overlay.style.position = 'fixed'
-		overlay.style.top = '50%'
-		overlay.style.left = '50%'
-		overlay.style.transform = 'translate(-50%, -50%)'
-		overlay.style.zIndex = '9999'
-		overlay.style.border = '1px solid rgba(0,0,0,1)'
-		overlay.style.borderRadius = '0.5rem'
-
-		const close_button = document.createElement('button')
-		close_button.type = 'button'
-		close_button.id = 'close_button'
-		close_button.classList.add('btn', 'btn-sm', 'btn-outline-secondary')
-		close_button.style.position = 'absolute'
-		close_button.style.top = '6px'
-		close_button.style.right = '6px'
-		close_button.style.padding = '5px 5px'
-		close_button.innerHTML = `<i class="fas fa-times fa-lg"></i>`
-		close_button.addEventListener('click', () => {
-			overlay.remove()
-		})
-
-		const title = document.createElement('h4')
-		title.style.marginTop = '0px'
-		title.style.display = 'inline-block'
-		title.style.padding = '1rem'
-		title.textContent = window_title
-
-		const inner_panel = document.createElement('div')
-		inner_panel.style =
-			'background-color: #0D1117; width: auto; height: auto; padding:0.5rem; border-radius: 5px; box-shadow: 0px 0px 15px 5px rgba(0,0,0,0.5);overflow-y: auto; overflow-x: hidden;'
-
-		inner_panel.appendChild(title)
-		inner_panel.appendChild(close_button)
-
-		overlay.appendChild(inner_panel)
-		inner_panel.appendChild(element_to_append)
-		document.body.appendChild(overlay)
-	}
-
-	async function make_request_async(url) {
-		const response = await fetch(url)
-		if (response.status === 502) {
-			console.log(`API call failed, status code: ${response.status}`)
-			create_toast('API call failed', 'Status code: ' + response.status, 'error', 5000)
-			return false
-		}
-		try {
-			const data = await response.json()
-			if (data.length > 0) {
-				return data
-			} else {
-				console.log(`API call returned no data for: ${url}`)
-				create_toast('Empty response body for', url, 'error', 5000)
-				return false
-			}
-		} catch (error) {
-			console.log(`An error occurred while parsing the response: ${error}`)
-			create_toast('Error while parsing request', error, 'error', 5000)
-			return false
-		}
-	}
-
-	function make_request(url: string, func: Function) {
-		make_request_async(url).then(data => {
-			if (data) {
-				func(data)
-			} else {
-				func(false)
-			}
-		})
-		api_call_count++
-	}
 
 	function make_navbar_compact() {
 		let navbar = document.querySelector('form.navbar-form') as HTMLFormElement
@@ -952,71 +599,6 @@ import OnlinePlayer, { Region } from './types/online-player.interface'
 		return new Promise(resolve => {
 			setTimeout(func, timeout)
 			resolve()
-		})
-	}
-
-	function insert_flags_to_profiles() {
-		let follow_list = get_follow_list()
-		var a = document.getElementsByTagName('a')
-		Array.from(a).forEach(function (link) {
-			if (link.href.includes('https://surfheaven.eu/player/')) {
-				if (link.href.includes('#')) {
-					return
-				}
-
-				if (link.closest('.nav')) {
-					return
-				}
-
-				var id = link.href.split('https://surfheaven.eu/player/')[1]
-				let nickname = get_nickname(id)
-				let original_name = link.textContent
-
-				if (nickname) {
-					link.innerHTML = nickname
-					link.title = original_name
-				}
-
-				if (
-					follow_list.includes(id) &&
-					link.parentElement.parentElement.id != 'follow_list'
-				) {
-					link.classList.add('following')
-				}
-
-				if (id in user_effects && settings.user_effects) {
-					if (!link.querySelector('b')) {
-						link.innerHTML = '<b>' + link.innerHTML + '</b>'
-					}
-					link.classList.add(user_effects[id])
-					link.classList.remove('following')
-				}
-
-				if (
-					link.previousElementSibling &&
-					link.previousElementSibling.className.includes('flag')
-				)
-					return
-
-				if (!link.querySelector('img')) {
-					var country = ''
-
-					if (!settings.flags) return
-					var cached_country = unsafeWindow.localStorage.getItem(id)
-					if (cached_country) {
-						country = cached_country
-						link.innerHTML = create_flag(country) + ' ' + link.innerHTML
-					} else {
-						make_request('https://api.surfheaven.eu/api/playerinfo/' + id, data => {
-							if (data) {
-								country = data[0].country_code
-								unsafeWindow.localStorage.setItem(id, country)
-								link.innerHTML = create_flag(country) + ' ' + link.innerHTML
-							}
-						})
-					}
-				}
-			}
 		})
 	}
 
@@ -1916,33 +1498,6 @@ import OnlinePlayer, { Region } from './types/online-player.interface'
 
 	function auto_fetch_ranks() {
 		fetch_ranks(get_id())
-	}
-
-	function follow_user(id) {
-		let follow_list = unsafeWindow.localStorage.getItem('follow_list')
-		if (follow_list == null) {
-			unsafeWindow.localStorage.setItem('follow_list', id + ',')
-		} else {
-			if (follow_list.includes(id)) {
-				console.log('Unfollowing user ' + id)
-				follow_list = follow_list.replace(id + ',', '')
-			} else {
-				console.log('Following user ' + id)
-				follow_list += id + ','
-			}
-			unsafeWindow.localStorage.setItem('follow_list', follow_list)
-		}
-		refresh_follow_list()
-	}
-
-	function get_follow_list() {
-		let follow_list = unsafeWindow.localStorage.getItem('follow_list')
-		if (follow_list == null) {
-			return []
-		} else {
-			follow_list = follow_list.slice(0, -1)
-			return follow_list.split(',')
-		}
 	}
 
 	function dashboard_page() {
@@ -4816,66 +4371,6 @@ import OnlinePlayer, { Region } from './types/online-player.interface'
 		window.location.href = '/donate/'
 	}
 
-	function create_toast(title, message, type, timeout) {
-		if (!settings.toasts && type != 'info' && type != 'success') return
-		const toasts = document.querySelectorAll('.toast')
-
-		let total_height = 50 // align just under navbar
-		toasts.forEach(toast => {
-			total_height += toast.offsetHeight + parseInt(getComputedStyle(toast).marginBottom) + 10
-		})
-		const top_position = total_height + 20
-
-		const toast = document.createElement('div')
-		toast.classList.add('toast', `toast-${type}`)
-		toast.style.top = `${top_position}px`
-
-		const title_elem = document.createElement('h3')
-		title_elem.textContent = title
-		title_elem.style.marginBottom = 0
-		title_elem.classList.add('outlined')
-		toast.appendChild(title_elem)
-
-		const message_elem = document.createElement('h5')
-		message_elem.textContent = message
-		message_elem.classList.add('outlined')
-		message_elem.style.marginTop = '0.5rem'
-		if (message.length != 0) toast.appendChild(message_elem)
-
-		const closeButton = document.createElement('button')
-		closeButton.classList.add('close')
-		closeButton.textContent = '×'
-		closeButton.addEventListener('click', () => {
-			toast.style.animation = 'fade-out 0.5s forwards'
-			setTimeout(() => {
-				toast.remove()
-			}, 500)
-		})
-
-		toast.appendChild(closeButton)
-		document.body.appendChild(toast)
-
-		let timer = setTimeout(() => {
-			toast.style.animation = 'fade-out 0.5s forwards'
-			setTimeout(() => {
-				toast.remove()
-			}, 500)
-		}, timeout)
-
-		toast.addEventListener('mouseover', () => {
-			clearTimeout(timer)
-		})
-
-		toast.addEventListener('mouseout', () => {
-			timer = setTimeout(() => {
-				toast.style.animation = 'fade-out 0.5s forwards'
-				setTimeout(() => {
-					toast.remove()
-				}, 500)
-			}, timeout)
-		})
-	}
-
 	function set_nickname(id, nickname) {
 		if (nickname == '') {
 			unsafeWindow.localStorage.removeItem('nickname_' + id)
@@ -4941,7 +4436,229 @@ import OnlinePlayer, { Region } from './types/online-player.interface'
 			})
 		})
 	}
-})()
+}
+
+main()
+
+export function insert_flags_to_profiles() {
+	let follow_list = get_follow_list()
+	var a = document.getElementsByTagName('a')
+	Array.from(a).forEach(function (link) {
+		if (link.href.includes('https://surfheaven.eu/player/')) {
+			if (link.href.includes('#')) {
+				return
+			}
+
+			if (link.closest('.nav')) {
+				return
+			}
+
+			var id = link.href.split('https://surfheaven.eu/player/')[1]
+			let nickname = get_nickname(id)
+			let original_name = link.textContent
+
+			if (nickname) {
+				link.innerHTML = nickname
+				link.title = original_name
+			}
+
+			if (follow_list.includes(id) && link.parentElement.parentElement.id != 'follow_list') {
+				link.classList.add('following')
+			}
+
+			if (id in user_effects && settings.user_effects) {
+				if (!link.querySelector('b')) {
+					link.innerHTML = '<b>' + link.innerHTML + '</b>'
+				}
+				link.classList.add(user_effects[id])
+				link.classList.remove('following')
+			}
+
+			if (
+				link.previousElementSibling &&
+				link.previousElementSibling.className.includes('flag')
+			)
+				return
+
+			if (!link.querySelector('img')) {
+				var country = ''
+
+				if (!settings.flags) return
+				var cached_country = unsafeWindow.localStorage.getItem(id)
+				if (cached_country) {
+					country = cached_country
+					link.innerHTML = create_flag(country) + ' ' + link.innerHTML
+				} else {
+					make_request('https://api.surfheaven.eu/api/playerinfo/' + id, data => {
+						if (data) {
+							country = data[0].country_code
+							unsafeWindow.localStorage.setItem(id, country)
+							link.innerHTML = create_flag(country) + ' ' + link.innerHTML
+						}
+					})
+				}
+			}
+		}
+	})
+}
+
+export function make_request(url: string, func: Function) {
+	make_request_async(url).then(data => {
+		if (data) {
+			func(data)
+		} else {
+			func(false)
+		}
+	})
+	api_call_count++
+}
+
+export async function make_request_async(url) {
+	const response = await fetch(url)
+	if (response.status === 502) {
+		console.log(`API call failed, status code: ${response.status}`)
+		create_toast('API call failed', 'Status code: ' + response.status, 'error', 5000)
+		return false
+	}
+	try {
+		const data = await response.json()
+		if (data.length > 0) {
+			return data
+		} else {
+			console.log(`API call returned no data for: ${url}`)
+			create_toast('Empty response body for', url, 'error', 5000)
+			return false
+		}
+	} catch (error) {
+		console.log(`An error occurred while parsing the response: ${error}`)
+		create_toast('Error while parsing request', error, 'error', 5000)
+		return false
+	}
+}
+
+export function create_toast(title, message, type, timeout) {
+	if (!settings.toasts && type != 'info' && type != 'success') return
+	const toasts = document.querySelectorAll('.toast')
+
+	let total_height = 50 // align just under navbar
+	toasts.forEach(toast => {
+		total_height += toast.offsetHeight + parseInt(getComputedStyle(toast).marginBottom) + 10
+	})
+	const top_position = total_height + 20
+
+	const toast = document.createElement('div')
+	toast.classList.add('toast', `toast-${type}`)
+	toast.style.top = `${top_position}px`
+
+	const title_elem = document.createElement('h3')
+	title_elem.textContent = title
+	title_elem.style.marginBottom = 0
+	title_elem.classList.add('outlined')
+	toast.appendChild(title_elem)
+
+	const message_elem = document.createElement('h5')
+	message_elem.textContent = message
+	message_elem.classList.add('outlined')
+	message_elem.style.marginTop = '0.5rem'
+	if (message.length != 0) toast.appendChild(message_elem)
+
+	const closeButton = document.createElement('button')
+	closeButton.classList.add('close')
+	closeButton.textContent = '×'
+	closeButton.addEventListener('click', () => {
+		toast.style.animation = 'fade-out 0.5s forwards'
+		setTimeout(() => {
+			toast.remove()
+		}, 500)
+	})
+
+	toast.appendChild(closeButton)
+	document.body.appendChild(toast)
+
+	let timer = setTimeout(() => {
+		toast.style.animation = 'fade-out 0.5s forwards'
+		setTimeout(() => {
+			toast.remove()
+		}, 500)
+	}, timeout)
+
+	toast.addEventListener('mouseover', () => {
+		clearTimeout(timer)
+	})
+
+	toast.addEventListener('mouseout', () => {
+		timer = setTimeout(() => {
+			toast.style.animation = 'fade-out 0.5s forwards'
+			setTimeout(() => {
+				toast.remove()
+			}, 500)
+		}, timeout)
+	})
+}
+
+export function format_date(time: string) {
+	let today = new Date()
+	let date = new Date(time)
+	let diff = today.getTime() - date.getTime()
+	let days = Math.floor(diff / (1000 * 60 * 60 * 24))
+	let minutes = Math.floor(diff / (1000 * 60))
+	if (days === 0 && minutes < 60) {
+		return minutes + ' minutes ago'
+	} else if (days === 0 && minutes >= 60) {
+		let hours = Math.floor(minutes / 60)
+		minutes -= hours * 60
+		return hours + 'h ' + minutes + 'm ago'
+	} else if (days === 1) {
+		return 'Yesterday'
+	} else if (days < 7) {
+		return days + 'd ago'
+	} else {
+		let month = date.toLocaleString('default', { month: 'short' })
+		return month + ' ' + date.getDate() + ', ' + date.getFullYear()
+	}
+}
+
+export function show_overlay_window(window_title: string, element_to_append: Element) {
+	const overlay = document.createElement('div')
+	overlay.id = 'overlay'
+	overlay.style.position = 'fixed'
+	overlay.style.top = '50%'
+	overlay.style.left = '50%'
+	overlay.style.transform = 'translate(-50%, -50%)'
+	overlay.style.zIndex = '9999'
+	overlay.style.border = '1px solid rgba(0,0,0,1)'
+	overlay.style.borderRadius = '0.5rem'
+
+	const close_button = document.createElement('button')
+	close_button.type = 'button'
+	close_button.id = 'close_button'
+	close_button.classList.add('btn', 'btn-sm', 'btn-outline-secondary')
+	close_button.style.position = 'absolute'
+	close_button.style.top = '6px'
+	close_button.style.right = '6px'
+	close_button.style.padding = '5px 5px'
+	close_button.innerHTML = `<i class="fas fa-times fa-lg"></i>`
+	close_button.addEventListener('click', () => {
+		overlay.remove()
+	})
+
+	const title = document.createElement('h4')
+	title.style.marginTop = '0px'
+	title.style.display = 'inline-block'
+	title.style.padding = '1rem'
+	title.textContent = window_title
+
+	const inner_panel = document.createElement('div')
+	inner_panel.style =
+		'background-color: #0D1117; width: auto; height: auto; padding:0.5rem; border-radius: 5px; box-shadow: 0px 0px 15px 5px rgba(0,0,0,0.5);overflow-y: auto; overflow-x: hidden;'
+
+	inner_panel.appendChild(title)
+	inner_panel.appendChild(close_button)
+
+	overlay.appendChild(inner_panel)
+	inner_panel.appendChild(element_to_append)
+	document.body.appendChild(overlay)
+}
 
 GM_addStyle(`
     .ct-double-octave:after,.ct-golden-section:after,.ct-major-eleventh:after,.ct-major-second:after,.ct-major-seventh:after,.ct-major-sixth:after,.ct-major-tenth:after,.ct-major-third:after,.ct-major-twelfth:after,.ct-minor-second:after,.ct-minor-seventh:after,.ct-minor-sixth:after,.ct-minor-third:after,.ct-octave:after,.ct-perfect-fifth:after,.ct-perfect-fourth:after,.ct-square:after{content:"";clear:both}.ct-label{fill:#ffffff;color:#ffffff;font-size:1rem;line-height:1.41}.ct-chart-bar .ct-label,.ct-chart-line .ct-label{display:block;display:-webkit-box;display:-moz-box;display:-ms-flexbox;display:-webkit-flex;display:flex}.ct-chart-donut .ct-label,.ct-chart-pie .ct-label{dominant-baseline:central}.ct-label.ct-horizontal.ct-start{-webkit-box-align:flex-end;-webkit-align-items:flex-end;-ms-flex-align:flex-end;align-items:flex-end;-webkit-box-pack:flex-start;-webkit-justify-content:flex-start;-ms-flex-pack:flex-start;justify-content:flex-start;text-align:left;text-anchor:start}.ct-label.ct-horizontal.ct-end{-webkit-box-align:flex-start;-webkit-align-items:flex-start;-ms-flex-align:flex-start;align-items:flex-start;-webkit-box-pack:flex-start;-webkit-justify-content:flex-start;-ms-flex-pack:flex-start;justify-content:flex-start;text-align:left;text-anchor:start}.ct-label.ct-vertical.ct-start{-webkit-box-align:flex-end;-webkit-align-items:flex-end;-ms-flex-align:flex-end;align-items:flex-end;-webkit-box-pack:flex-end;-webkit-justify-content:flex-end;-ms-flex-pack:flex-end;justify-content:flex-end;text-align:right;text-anchor:end}.ct-label.ct-vertical.ct-end{-webkit-box-align:flex-end;-webkit-align-items:flex-end;-ms-flex-align:flex-end;align-items:flex-end;-webkit-box-pack:flex-start;-webkit-justify-content:flex-start;-ms-flex-pack:flex-start;justify-content:flex-start;text-align:left;text-anchor:start}.ct-chart-bar .ct-label.ct-horizontal.ct-start{-webkit-box-align:flex-end;-webkit-align-items:flex-end;-ms-flex-align:flex-end;align-items:flex-end;-webkit-box-pack:center;-webkit-justify-content:center;-ms-flex-pack:center;justify-content:center;text-align:center;text-anchor:start}.ct-chart-bar .ct-label.ct-horizontal.ct-end{-webkit-box-align:flex-start;-webkit-align-items:flex-start;-ms-flex-align:flex-start;align-items:flex-start;-webkit-box-pack:center;-webkit-justify-content:center;-ms-flex-pack:center;justify-content:center;text-align:center;text-anchor:start}.ct-chart-bar.ct-horizontal-bars .ct-label.ct-horizontal.ct-start{-webkit-box-align:flex-end;-webkit-align-items:flex-end;-ms-flex-align:flex-end;align-items:flex-end;-webkit-box-pack:flex-start;-webkit-justify-content:flex-start;-ms-flex-pack:flex-start;justify-content:flex-start;text-align:left;text-anchor:start}.ct-chart-bar.ct-horizontal-bars .ct-label.ct-horizontal.ct-end{-webkit-box-align:flex-start;-webkit-align-items:flex-start;-ms-flex-align:flex-start;align-items:flex-start;-webkit-box-pack:flex-start;-webkit-justify-content:flex-start;-ms-flex-pack:flex-start;justify-content:flex-start;text-align:left;text-anchor:start}.ct-chart-bar.ct-horizontal-bars .ct-label.ct-vertical.ct-start{-webkit-box-align:center;-webkit-align-items:center;-ms-flex-align:center;align-items:center;-webkit-box-pack:flex-end;-webkit-justify-content:flex-end;-ms-flex-pack:flex-end;justify-content:flex-end;text-align:right;text-anchor:end}.ct-chart-bar.ct-horizontal-bars .ct-label.ct-vertical.ct-end{-webkit-box-align:center;-webkit-align-items:center;-ms-flex-align:center;align-items:center;-webkit-box-pack:flex-start;-webkit-justify-content:flex-start;-ms-flex-pack:flex-start;justify-content:flex-start;text-align:left;text-anchor:end}.ct-grid{stroke:rgba(0,0,0,.2);stroke-width:1px;stroke-dasharray:2px}.ct-grid-background{fill:none}.ct-point{stroke-width:10px;stroke-linecap:round}.ct-line{fill:none;stroke-width:2px}.ct-area{stroke:none;fill-opacity:.1}.ct-bar{fill:none;stroke-width:10px}.ct-slice-donut{fill:none;stroke-width:60px}.ct-series-a .ct-bar,.ct-series-a .ct-line,.ct-series-a .ct-point,.ct-series-a .ct-slice-donut{stroke:#d70206}.ct-series-a .ct-area,.ct-series-a .ct-slice-donut-solid,.ct-series-a .ct-slice-pie{fill:#d70206}.ct-series-b .ct-bar,.ct-series-b .ct-line,.ct-series-b .ct-point,.ct-series-b .ct-slice-donut{stroke:#f05b4f}.ct-series-b .ct-area,.ct-series-b .ct-slice-donut-solid,.ct-series-b .ct-slice-pie{fill:#f05b4f}.ct-series-c .ct-bar,.ct-series-c .ct-line,.ct-series-c .ct-point,.ct-series-c .ct-slice-donut{stroke:#f4c63d}.ct-series-c .ct-area,.ct-series-c .ct-slice-donut-solid,.ct-series-c .ct-slice-pie{fill:#f4c63d}.ct-series-d .ct-bar,.ct-series-d .ct-line,.ct-series-d .ct-point,.ct-series-d .ct-slice-donut{stroke:#d17905}.ct-series-d .ct-area,.ct-series-d .ct-slice-donut-solid,.ct-series-d .ct-slice-pie{fill:#d17905}.ct-series-e .ct-bar,.ct-series-e .ct-line,.ct-series-e .ct-point,.ct-series-e .ct-slice-donut{stroke:#453d3f}.ct-series-e .ct-area,.ct-series-e .ct-slice-donut-solid,.ct-series-e .ct-slice-pie{fill:#453d3f}.ct-series-f .ct-bar,.ct-series-f .ct-line,.ct-series-f .ct-point,.ct-series-f .ct-slice-donut{stroke:#59922b}.ct-series-f .ct-area,.ct-series-f .ct-slice-donut-solid,.ct-series-f .ct-slice-pie{fill:#59922b}.ct-series-g .ct-bar,.ct-series-g .ct-line,.ct-series-g .ct-point,.ct-series-g .ct-slice-donut{stroke:#0544d3}.ct-series-g .ct-area,.ct-series-g .ct-slice-donut-solid,.ct-series-g .ct-slice-pie{fill:#0544d3}.ct-series-h .ct-bar,.ct-series-h .ct-line,.ct-series-h .ct-point,.ct-series-h .ct-slice-donut{stroke:#6b0392}.ct-series-h .ct-area,.ct-series-h .ct-slice-donut-solid,.ct-series-h .ct-slice-pie{fill:#6b0392}.ct-series-i .ct-bar,.ct-series-i .ct-line,.ct-series-i .ct-point,.ct-series-i .ct-slice-donut{stroke:#f05b4f}.ct-series-i .ct-area,.ct-series-i .ct-slice-donut-solid,.ct-series-i .ct-slice-pie{fill:#f05b4f}.ct-series-j .ct-bar,.ct-series-j .ct-line,.ct-series-j .ct-point,.ct-series-j .ct-slice-donut{stroke:#dda458}.ct-series-j .ct-area,.ct-series-j .ct-slice-donut-solid,.ct-series-j .ct-slice-pie{fill:#dda458}.ct-series-k .ct-bar,.ct-series-k .ct-line,.ct-series-k .ct-point,.ct-series-k .ct-slice-donut{stroke:#eacf7d}.ct-series-k .ct-area,.ct-series-k .ct-slice-donut-solid,.ct-series-k .ct-slice-pie{fill:#eacf7d}.ct-series-l .ct-bar,.ct-series-l .ct-line,.ct-series-l .ct-point,.ct-series-l .ct-slice-donut{stroke:#86797d}.ct-series-l .ct-area,.ct-series-l .ct-slice-donut-solid,.ct-series-l .ct-slice-pie{fill:#86797d}.ct-series-m .ct-bar,.ct-series-m .ct-line,.ct-series-m .ct-point,.ct-series-m .ct-slice-donut{stroke:#b2c326}.ct-series-m .ct-area,.ct-series-m .ct-slice-donut-solid,.ct-series-m .ct-slice-pie{fill:#b2c326}.ct-series-n .ct-bar,.ct-series-n .ct-line,.ct-series-n .ct-point,.ct-series-n .ct-slice-donut{stroke:#6188e2}.ct-series-n .ct-area,.ct-series-n .ct-slice-donut-solid,.ct-series-n .ct-slice-pie{fill:#6188e2}.ct-series-o .ct-bar,.ct-series-o .ct-line,.ct-series-o .ct-point,.ct-series-o .ct-slice-donut{stroke:#a748ca}.ct-series-o .ct-area,.ct-series-o .ct-slice-donut-solid,.ct-series-o .ct-slice-pie{fill:#a748ca}.ct-square{display:block;position:relative;width:100%}.ct-square:before{display:block;float:left;content:"";width:0;height:0;padding-bottom:100%}.ct-square:after{display:table}.ct-square>svg{display:block;position:absolute;top:0;left:0}.ct-minor-second{display:block;position:relative;width:100%}.ct-minor-second:before{display:block;float:left;content:"";width:0;height:0;padding-bottom:93.75%}.ct-minor-second:after{display:table}.ct-minor-second>svg{display:block;position:absolute;top:0;left:0}.ct-major-second{display:block;position:relative;width:100%}.ct-major-second:before{display:block;float:left;content:"";width:0;height:0;padding-bottom:88.8888888889%}.ct-major-second:after{display:table}.ct-major-second>svg{display:block;position:absolute;top:0;left:0}.ct-minor-third{display:block;position:relative;width:100%}.ct-minor-third:before{display:block;float:left;content:"";width:0;height:0;padding-bottom:83.3333333333%}.ct-minor-third:after{display:table}.ct-minor-third>svg{display:block;position:absolute;top:0;left:0}.ct-major-third{display:block;position:relative;width:100%}.ct-major-third:before{display:block;float:left;content:"";width:0;height:0;padding-bottom:80%}.ct-major-third:after{display:table}.ct-major-third>svg{display:block;position:absolute;top:0;left:0}.ct-perfect-fourth{display:block;position:relative;width:100%}.ct-perfect-fourth:before{display:block;float:left;content:"";width:0;height:0;padding-bottom:75%}.ct-perfect-fourth:after{display:table}.ct-perfect-fourth>svg{display:block;position:absolute;top:0;left:0}.ct-perfect-fifth{display:block;position:relative;width:100%}.ct-perfect-fifth:before{display:block;float:left;content:"";width:0;height:0;padding-bottom:66.6666666667%}.ct-perfect-fifth:after{display:table}.ct-perfect-fifth>svg{display:block;position:absolute;top:0;left:0}.ct-minor-sixth{display:block;position:relative;width:100%}.ct-minor-sixth:before{display:block;float:left;content:"";width:0;height:0;padding-bottom:62.5%}.ct-minor-sixth:after{display:table}.ct-minor-sixth>svg{display:block;position:absolute;top:0;left:0}.ct-golden-section{display:block;position:relative;width:100%}.ct-golden-section:before{display:block;float:left;content:"";width:0;height:0;padding-bottom:61.804697157%}.ct-golden-section:after{display:table}.ct-golden-section>svg{display:block;position:absolute;top:0;left:0}.ct-major-sixth{display:block;position:relative;width:100%}.ct-major-sixth:before{display:block;float:left;content:"";width:0;height:0;padding-bottom:60%}.ct-major-sixth:after{display:table}.ct-major-sixth>svg{display:block;position:absolute;top:0;left:0}.ct-minor-seventh{display:block;position:relative;width:100%}.ct-minor-seventh:before{display:block;float:left;content:"";width:0;height:0;padding-bottom:56.25%}.ct-minor-seventh:after{display:table}.ct-minor-seventh>svg{display:block;position:absolute;top:0;left:0}.ct-major-seventh{display:block;position:relative;width:100%}.ct-major-seventh:before{display:block;float:left;content:"";width:0;height:0;padding-bottom:53.3333333333%}.ct-major-seventh:after{display:table}.ct-major-seventh>svg{display:block;position:absolute;top:0;left:0}.ct-octave{display:block;position:relative;width:100%}.ct-octave:before{display:block;float:left;content:"";width:0;height:0;padding-bottom:50%}.ct-octave:after{display:table}.ct-octave>svg{display:block;position:absolute;top:0;left:0}.ct-major-tenth{display:block;position:relative;width:100%}.ct-major-tenth:before{display:block;float:left;content:"";width:0;height:0;padding-bottom:40%}.ct-major-tenth:after{display:table}.ct-major-tenth>svg{display:block;position:absolute;top:0;left:0}.ct-major-eleventh{display:block;position:relative;width:100%}.ct-major-eleventh:before{display:block;float:left;content:"";width:0;height:0;padding-bottom:37.5%}.ct-major-eleventh:after{display:table}.ct-major-eleventh>svg{display:block;position:absolute;top:0;left:0}.ct-major-twelfth{display:block;position:relative;width:100%}.ct-major-twelfth:before{display:block;float:left;content:"";width:0;height:0;padding-bottom:33.3333333333%}.ct-major-twelfth:after{display:table}.ct-major-twelfth>svg{display:block;position:absolute;top:0;left:0}.ct-double-octave{display:block;position:relative;width:100%}.ct-double-octave:before{display:block;float:left;content:"";width:0;height:0;padding-bottom:25%}.ct-double-octave:after{display:table}.ct-double-octave>svg{display:block;position:absolute;top:0;left:0}

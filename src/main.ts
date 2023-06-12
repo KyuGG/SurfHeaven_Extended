@@ -148,35 +148,34 @@ async function main() {
 			}
 		}
 		// more compact search bar
-		let search_bar = document.querySelector('input.form-control:nth-child(4)')
+		const search_bar = document.querySelector(
+			'input.form-control:nth-child(4)'
+		) as HTMLInputElement
 		search_bar.style.width = '150px'
 		search_bar.placeholder = 'Search'
 	}
 
-	function map_youtube_link(map_name) {
-		var links = Array.from(document.querySelectorAll('a'))
-		var has_youtube_link = links.some(function (e) {
-			return e.href.includes('youtube.com/watch')
-		})
-		if (!has_youtube_link) {
-			var media_div = document.querySelector('.media')
-			var youtube_link = document.createElement('h5')
-			youtube_link.innerHTML = `<i style="color: red;" class="fab fa-youtube fa-lg"></i><a href="https://www.youtube.com/results?search_query=${map_name}" target="_blank">Search the map on Youtube</a>`
-			media_div.appendChild(youtube_link)
+	function map_youtube_link(mapName: string) {
+		const links = Array.from(document.querySelectorAll('a'))
+		const hasYoutubeLink = links.some(el => el.href.includes('youtube.com/watch'))
+
+		if (!hasYoutubeLink) {
+			const mediaDiv = document.querySelector('.media') as HTMLDivElement
+			const youtubeLink = document.createElement('h5')
+			youtubeLink.innerHTML = `<i style="color: red;" class="fab fa-youtube fa-lg"></i><a href="https://www.youtube.com/results?search_query=${mapName}" target="_blank">Search the map on Youtube</a>`
+			mediaDiv.appendChild(youtubeLink)
 		}
 	}
 
 	function purge_flags_cache() {
-		Object.keys(unsafeWindow.localStorage).forEach(function (key, value) {
-			if (!isNaN(key)) {
-				unsafeWindow.localStorage.removeItem(key)
-			}
+		Object.keys(unsafeWindow.localStorage).forEach((key, value) => {
+			if (!isNaN(Number(key))) unsafeWindow.localStorage.removeItem(key)
 		})
 	}
 
 	function add_country_dropdown() {
-		$(document).ready(function () {
-			var countries = [
+		$(document).ready(() => {
+			const countries = [
 				'ALA',
 				'ALB',
 				'DZA',
@@ -333,30 +332,30 @@ async function main() {
 				'ZMB',
 				'XKX',
 			]
-			var ctop_panel_heading_div = document.getElementsByClassName('panel-heading')[1]
-			var ctop_title_text = ctop_panel_heading_div.querySelector('span')
-			var ctop_dropdown = document.createElement('select')
+			const ctop_panel_heading_div = document.getElementsByClassName('panel-heading')[1]
+			const ctop_title_text = ctop_panel_heading_div.querySelector('span')
+			const ctop_dropdown = document.createElement('select')
 			ctop_dropdown.className = 'form-control'
 			ctop_dropdown.style.width = '100px'
 			ctop_dropdown.style.display = 'inline'
 			ctop_dropdown.style.marginRight = '10px'
 			ctop_dropdown.id = 'ctop_dropdown'
 			for (var i = 0; i < countries.length; i++) {
-				var ctop_option = document.createElement('option')
-				var full_name = new Intl.DisplayNames(['en'], {
+				const ctop_option = document.createElement('option')
+				const full_name = new Intl.DisplayNames(['en'], {
 					type: 'region',
 				})
-				var country_name = full_name.of(countryISOMapping(countries[i]))
-				ctop_option.innerHTML = country_name
+				const country_name = full_name.of(countryISOMapping(countries[i]) || '')
+				ctop_option.innerText = country_name || ''
 				ctop_option.value = countries[i]
 				ctop_dropdown.appendChild(ctop_option)
 			}
 			ctop_panel_heading_div.insertBefore(ctop_dropdown, ctop_title_text)
 			ctop_dropdown.selectedIndex = countries.indexOf(
-				unsafeWindow.localStorage.getItem('country')
+				unsafeWindow.localStorage.getItem('country') || ''
 			)
-			ctop_dropdown.addEventListener('change', function () {
-				var country = ctop_dropdown.value
+			ctop_dropdown.addEventListener('change', () => {
+				const country = ctop_dropdown.value
 				unsafeWindow.localStorage.setItem('country', country)
 				window.location.reload()
 			})
@@ -364,62 +363,68 @@ async function main() {
 	}
 
 	function reset_ranks() {
-		const table = document.querySelector('.table')
-		if (table.rows[0].childElementCount >= 6) {
-			for (let row of table.rows) {
-				row.deleteCell(4)
-				row.deleteCell(3)
-				if (row.cells[2].childElementCount >= 2) {
-					row.cells[2].removeChild(row.cells[2].children[2])
-				}
+		const table = document.querySelector('.table') as HTMLTableElement
+		if (table.rows[0].childElementCount < 6) return
+
+		for (const row of table.rows) {
+			row.deleteCell(4)
+			row.deleteCell(3)
+			if (row.cells[2].childElementCount >= 2) {
+				row.cells[2].removeChild(row.cells[2].children[2])
 			}
 		}
 	}
 
 	async function set_id() {
-		var id_input = document.querySelector('.custom-id-input')
+		const id_input = document.querySelector('.custom-id-input') as HTMLInputElement
 
-		if (id_input.value) {
-			make_request(
-				'https://api.surfheaven.eu/api/playerinfo/' + id_input.value,
-				async data => {
-					if (data) {
-						custom_id = id_input.value
-						await GM.setValue('sh_ranks_custom_id', custom_id)
+		if (!id_input.value) return
 
-						id_input.placeholder = custom_id
-						id_input.value = ''
-						document.querySelector('.custom-id-button').disabled = true
+		make_request(
+			`https://api.surfheaven.eu/api/playerinfo/${id_input.value}`,
+			async ([playerInfo]: [PlayerInfo]) => {
+				if (!playerInfo) return
 
-						reset_ranks()
-						fetch_ranks(custom_id)
-					}
-				}
-			)
-		}
+				custom_id = id_input.value
+				await GM.setValue('sh_ranks_custom_id', custom_id)
+
+				id_input.placeholder = custom_id
+				id_input.value = ''
+				const customIdButton = document.querySelector(
+					'.custom-id-button'
+				) as HTMLButtonElement
+				customIdButton.disabled = true
+
+				reset_ranks()
+				fetch_ranks(custom_id)
+			}
+		)
 	}
 
 	async function handle_input_change() {
-		document.querySelector('.custom-id-button').disabled = false
+		const customIdButton = document.querySelector('.custom-id-button') as HTMLButtonElement
+		customIdButton.disabled = false
 	}
 
 	async function handle_checkbox(cb) {
-		var my_div = document.querySelector('.custom-id-div')
+		var my_div = document.querySelector('.custom-id-div') as HTMLDivElement
 		cb.target.disabled = true
 		if (cb.target.checked) {
 			await GM.setValue('sh_ranks_use_custom_id', true)
 
 			var id_input = document.createElement('input')
 			id_input.className = 'form-control custom-id-input'
-			id_input.style =
-				'display: inline-block; margin-left: 10px; border: 1px solid rgb(247, 175, 62); width: 100px;'
+			id_input.style.display = 'inline-block'
+			id_input.style.marginLeft = '10px'
+			id_input.style.border = '1px solid rgb(247, 175, 62)'
+			id_input.style.width = '100px'
 			id_input.type = 'text'
 			id_input.oninput = handle_input_change
 
 			var button = document.createElement('button')
 			button.className = 'btn btn-success btn-xs custom-id-button'
 			button.innerHTML = 'Set'
-			button.style = 'margin-left: 10px;'
+			button.style.marginLeft = '10px'
 			button.onclick = set_id
 
 			if (custom_id) {
@@ -436,23 +441,23 @@ async function main() {
 		} else {
 			await GM.setValue('sh_ranks_use_custom_id', false)
 
-			my_div.removeChild(my_div.lastElementChild)
-			my_div.removeChild(my_div.lastElementChild)
+			my_div.removeChild(my_div.lastElementChild as Element)
+			my_div.removeChild(my_div.lastElementChild as Element)
 			reset_ranks()
 			auto_fetch_ranks()
 		}
 	}
 
-	async function do_after(func, timeout) {
+	async function do_after(func: Function, timeout: number): Promise<null>{
 		return new Promise(resolve => {
 			setTimeout(func, timeout)
-			resolve()
+			resolve(null)
 		})
 	}
 
-	function fetch_map_rank(map_name) {
+	function fetch_map_rank(map_name:string) {
 		var _id = get_id()
-		var titlediv = document.querySelector('.media')
+		var titlediv = document.querySelector('.media') as HTMLDivElement
 		var rank_elem = document.createElement('h4')
 		rank_elem.innerHTML = 'You have not completed this map :('
 		rank_elem.style.marginBottom = '5px'
@@ -491,8 +496,8 @@ async function main() {
 		let bonus_total = new Array(7).fill(0)
 		let target_row = '.panel-c-warning > div:nth-child(1) > div:nth-child(1)'
 		let target_div = document.querySelector(target_row)
-		let user_div = document.querySelector(target_row + ' > div:nth-child(1)')
-		let stats_div = document.querySelector(target_row + ' > div:nth-child(2)')
+		let user_div = document.querySelector(target_row + ' > div:nth-child(1)')!
+		let stats_div = document.querySelector(target_row + ' > div:nth-child(2)')!
 		let completionsbytier_div = document.createElement('div')
 
 		user_div.className = 'col-sm-4'
